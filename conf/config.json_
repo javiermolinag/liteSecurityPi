@@ -1,0 +1,7 @@
+{
+"threshold": 35
+"sender_email": "emailSender@gmail.com"
+"password": "passwordSender"
+
+"receiver_email": "emailReceiver@gmail.com"
+}
