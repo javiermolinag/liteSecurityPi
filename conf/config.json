@@ -1,7 +1,0 @@
-{
-"threshold_psnr": 30,
-"threshold_mse": 60,
-"threshold_mae": 4,
-"threshold": 4,
-
-}
