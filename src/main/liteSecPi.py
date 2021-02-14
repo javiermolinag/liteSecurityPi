@@ -66,7 +66,7 @@ def main():
             print(diff)
             if diff > conf["threshold"]:
                 timeNow = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-                cv2.imwrite("../../data/img_" + str(timeNow) + ".jpg", frame)
+                cv2.imwrite("../../data/img_" + str(timeNow) + "_" + str(diff) + "_.jpg", frame)
                 #sendMail("Movimiento detectado..." + str(psnr),"image.jpg")
             #cv2.imshow('frame',frame) ##
             frameAnt = np.copy(frame)
