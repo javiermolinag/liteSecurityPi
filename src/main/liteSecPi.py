@@ -1,19 +1,20 @@
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email.mime.text import MIMEText
-from email import encoders
-
-import datetime
-
-import smtplib
-import email
-import ssl
-
 import numpy as np
+import sendMail
+import datetime
 import json
+import time
 import cv2
+import sys
 
-conf = json.load(open("../../conf/config.json"))
+def motionDetection(diff,frame,conf):
+    if diff >= conf["threshold"]:
+        timeNow = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S.%f")
+        fileName = "img_" + str(timeNow) + ".jpg"
+        cv2.imwrite("../../data/img/" + fileName, frame)
+        with open("../../data/txt/files", 'a') as files:
+            files.write(fileName + ",")
+        return True
+    return False
 
 def getDiffMetric(image1, image2):
     image1 = image1.astype(np.float64)
@@ -25,59 +26,60 @@ def getDiffMetric(image1, image2):
     #return psnr, mse, mae
     return mae
 
-def attachImage(filename):
-    with open(filename, "rb") as attachment:
-        part = MIMEBase("application", "octet-stream")
-        part.set_payload(attachment.read()) 
-    encoders.encode_base64(part)
-    part.add_header("Content-Disposition","attachment; filename= {0}".format(filename))
-    return part
-
-def sendMail(msg, filename=""):
-    subject = "Security Cam"
-    body = "This is an email sent from liteSecurityPi \n\n" + msg
-    message = MIMEMultipart()
-    message["From"] = conf["sender_email"]
-    message["To"] = conf["receiver_email"]
-    message["Subject"] = subject
-    message.attach(MIMEText(body, "plain"))
-    if len(filename) > 0:
-        message.attach(attachImage(filename))
-    text = message.as_string()
-    context = ssl.create_default_context()
-    
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        server.starttls(context=context)
-        server.login(message["From"], conf["password"])
-        server.sendmail(message["From"], message["To"], text)
-
 def main():
+    capture_duration = 10
     cap = cv2.VideoCapture(-1)
     cap.set(3,1280)
     cap.set(4,720)
     #frameAnt = np.zeros((480,640,3),np.uint8)
     frameAnt = np.zeros((720,1280,3),np.uint8)
     while(cap.isOpened()):
+        conf = json.load(open("../../conf/config.json"))
+        if conf["stopProc"] == 1:
+            break
         ret, frame = cap.read()
-        if ret==True:
-            #psnr,mse,mae = getDiffMetric(frame,frameAnt) ##
-            #print(psnr, " --- ", mse, " --- ", mae) ##
+        if ret == True:
             diff = getDiffMetric(frame,frameAnt)
             print(diff)
-            if diff > conf["threshold"]:
-                timeNow = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-                cv2.imwrite("../../data/img_" + str(timeNow) + ".jpg", frame)
-                #sendMail("Movimiento detectado..." + str(psnr),"image.jpg")
+            sys.stdout.flush()
+            flag = motionDetection(diff,frame,conf)
             #cv2.imshow('frame',frame) ##
+            
+            if flag:
+                start_time = time.time()
+                timeNow = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S.%f")
+                while( int(time.time() - start_time) < capture_duration ):
+                    time.sleep(0.5)
+                    ret, frame = cap.read()
+                    if ret == True:
+                        motionDetection(conf["threshold"],frame,conf)
+                        
             frameAnt = np.copy(frame)
-            #if cv2.waitKey(1) & 0xFF == ord('q'):
-            #    sendMail("KeyboardInterrupt")
-            #    break
+            
+            ''' write video not working yet
+            if flag:
+                start_time = time.time()
+                timeNow = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S.%f")
+                out = cv2.VideoWriter("../../data/img/" + "outpy_" + timeNow + ".avi",cv2.VideoWriter_fourcc(*'XVID'), 10, (640,480))
+                while( int(time.time() - start_time) < capture_duration ):
+                    if cap.isOpened():
+                        ret, frame = cap.read()
+                        frameAnt = np.copy(frame)
+                        if ret == True:
+                            frame = cv2.flip(frame,0)
+                            print("writing video...")
+                            out.write(frame)
+                out.release()
+                cap.release()
+            '''
+
         else:
             sendMail("Something went wrong with camera()")
             break
     cap.release()
-    cv2.destroyAllWindows() ##
+    #cv2.destroyAllWindows() ## sudo service uv4l_raspicam start
 
 if __name__ == "__main__":
+    f = open('../../log/liteSecPi.log', 'w')
+    sys.stdout = f
     main()
