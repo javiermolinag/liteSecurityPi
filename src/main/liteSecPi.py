@@ -4,11 +4,9 @@ import datetime
 import json
 import time
 import cv2
+import sys
 
-
-conf = json.load(open("../../conf/config.json"))
-
-def motionDetection(diff,frame):
+def motionDetection(diff,frame,conf):
     if diff >= conf["threshold"]:
         timeNow = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S.%f")
         fileName = "img_" + str(timeNow) + ".jpg"
@@ -36,11 +34,15 @@ def main():
     #frameAnt = np.zeros((480,640,3),np.uint8)
     frameAnt = np.zeros((720,1280,3),np.uint8)
     while(cap.isOpened()):
+        conf = json.load(open("../../conf/config.json"))
+        if conf["stopProc"] == 1:
+            break
         ret, frame = cap.read()
         if ret == True:
             diff = getDiffMetric(frame,frameAnt)
             print(diff)
-            flag = motionDetection(diff,frame)
+            sys.stdout.flush()
+            flag = motionDetection(diff,frame,conf)
             #cv2.imshow('frame',frame) ##
             
             if flag:
@@ -50,7 +52,7 @@ def main():
                     time.sleep(0.5)
                     ret, frame = cap.read()
                     if ret == True:
-                        motionDetection(conf["threshold"],frame)
+                        motionDetection(conf["threshold"],frame,conf)
                         
             frameAnt = np.copy(frame)
             
@@ -75,7 +77,9 @@ def main():
             sendMail("Something went wrong with camera()")
             break
     cap.release()
-    #cv2.destroyAllWindows() ##
+    #cv2.destroyAllWindows() ## sudo service uv4l_raspicam start
 
 if __name__ == "__main__":
+    f = open('../../log/liteSecPi.log', 'w')
+    sys.stdout = f
     main()

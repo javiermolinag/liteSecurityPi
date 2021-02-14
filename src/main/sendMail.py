@@ -10,9 +10,8 @@ import email
 import time
 import json
 import ssl
+import sys
 import os
-
-conf = json.load(open("../../conf/config.json"))
 
 def removeFile(path):
     file = "../../data/img/" + path
@@ -20,8 +19,10 @@ def removeFile(path):
         if os.path.exists(file):
             os.remove(file)
             print("File deleted..." + path)
+            sys.stdout.flush()
     except OSError as error:
         print("There was an error.", error)
+        sys.stdout.flush()
 
 def attachImage(filename):
     with open("../../data/img/" + filename, "rb") as attachment:
@@ -33,23 +34,30 @@ def attachImage(filename):
     return part
 
 def sendMail(msg, filename = []):
-    timeNow = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    subject = "Security Cam - " + timeNow
-    body = "This is an email sent from liteSecurityPi \n\n" + msg
-    message = MIMEMultipart()
-    message["From"] = conf["sender_email"]
-    message["To"] = conf["receiver_email"]
-    message["Subject"] = subject
-    message.attach(MIMEText(body, "plain"))
-    if len(filename) > 0:
-        for file in filename:
-            message.attach(attachImage(file))
-    text = message.as_string()
-    context = ssl.create_default_context()
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        server.starttls(context=context)
-        server.login(message["From"], conf["password"])
-        server.sendmail(message["From"], message["To"], text)
+    try:
+        conf = json.load(open("../../conf/config.json"))
+        if conf["stopProc"] == 1:
+            exit()
+        timeNow = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+        subject = "Security Cam - " + timeNow
+        body = "This is an email sent from liteSecurityPi \n\n" + msg
+        message = MIMEMultipart()
+        message["From"] = conf["sender_email"]
+        message["To"] = conf["receiver_email"]
+        message["Subject"] = subject
+        message.attach(MIMEText(body, "plain"))
+        if len(filename) > 0:
+            for file in filename:
+                message.attach(attachImage(file))
+        text = message.as_string()
+        context = ssl.create_default_context()
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls(context=context)
+            server.login(message["From"], conf["password"])
+            server.sendmail(message["From"], message["To"], text)
+    except Exception as e:
+        print(e)
+        sys.stdout.flush()
 
 def follow(file):
     file.seek(0,2)
@@ -66,9 +74,12 @@ def main():
     lines = follow(file)
     for line in lines:
         print("Movimiento detectado...",line.split(",")[:-1])
+        sys.stdout.flush()
         sendMail("Movimiento detectado...",line.split(",")[:-1])
         #for file in line.split(",")[:-1]:
             #removeFile(file)
     
 if __name__ == "__main__":
+    f = open('../../log/sendMail.log', 'w')
+    sys.stdout = f
     main()
